@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <style>body {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  /* do not increase min-width as some may use split screens */
+  min-width: 800px;
+  color: #999;
+}
+
+h1 {
+  font-size: 24px;
+  color: black;
+}
+
+h2 {
+  font-size: 16px;
+  color: black;
+}
+
+p {
+  color: black;
+}
+
+a {
+  color: #999;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+/******************************
+ * SUMMARY INFORMATION
+ ******************************/
+#environment td {
+  padding: 5px;
+  border: 1px solid #E6E6E6;
+}
+#environment tr:nth-child(odd) {
+  background-color: #f6f6f6;
+}
+
+/******************************
+ * TEST RESULT COLORS
+ ******************************/
+span.passed,
+.passed .col-result {
+  color: green;
+}
+
+span.skipped,
+span.xfailed,
+span.rerun,
+.skipped .col-result,
+.xfailed .col-result,
+.rerun .col-result {
+  color: orange;
+}
+
+span.error,
+span.failed,
+span.xpassed,
+.error .col-result,
+.failed .col-result,
+.xpassed .col-result {
+  color: red;
+}
+
+/******************************
+ * RESULTS TABLE
+ *
+ * 1. Table Layout
+ * 2. Extra
+ * 3. Sorting items
+ *
+ ******************************/
+/*------------------
+ * 1. Table Layout
+ *------------------*/
+#results-table {
+  border: 1px solid #e6e6e6;
+  color: #999;
+  font-size: 12px;
+  width: 100%;
+}
+#results-table th,
+#results-table td {
+  padding: 5px;
+  border: 1px solid #E6E6E6;
+  text-align: left;
+}
+#results-table th {
+  font-weight: bold;
+}
+
+/*------------------
+ * 2. Extra
+ *------------------*/
+.log {
+  background-color: #e6e6e6;
+  border: 1px solid #e6e6e6;
+  color: black;
+  display: block;
+  font-family: "Courier New", Courier, monospace;
+  height: 230px;
+  overflow-y: scroll;
+  padding: 5px;
+  white-space: pre-wrap;
+}
+.log:only-child {
+  height: inherit;
+}
+
+div.image {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin-left: 5px;
+  overflow: hidden;
+  width: 320px;
+}
+div.image img {
+  width: 320px;
+}
+
+div.video {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin-left: 5px;
+  overflow: hidden;
+  width: 320px;
+}
+div.video video {
+  overflow: hidden;
+  width: 320px;
+  height: 240px;
+}
+
+.collapsed {
+  display: none;
+}
+
+.expander::after {
+  content: " (show details)";
+  color: #BBB;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.collapser::after {
+  content: " (hide details)";
+  color: #BBB;
+  font-style: italic;
+  cursor: pointer;
+}
+
+/*------------------
+ * 3. Sorting items
+ *------------------*/
+.sortable {
+  cursor: pointer;
+}
+
+.sort-icon {
+  font-size: 0px;
+  float: left;
+  margin-right: 5px;
+  margin-top: 5px;
+  /*triangle*/
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+}
+.inactive .sort-icon {
+  /*finish triangle*/
+  border-top: 8px solid #E6E6E6;
+}
+.asc.active .sort-icon {
+  /*finish triangle*/
+  border-bottom: 8px solid #999;
+}
+.desc.active .sort-icon {
+  /*finish triangle*/
+  border-top: 8px solid #999;
+}
+</style></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++)
+        filterItems[i].hidden = false;
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>report2.html</h1>
+    <p>Report generated on 27-Jan-2022 at 21:41:02 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "1.0.0", "py": "1.11.0", "pytest": "6.2.5"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-10-10.0.19042-SP0</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"Faker": "11.3.0", "html": "3.1.1", "metadata": "1.11.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.9.10</td></tr></table>
+    <h2>Summary</h2>
+    <p>1 tests ran in 65.42 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">0 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">1 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">testcases/test_searchflights.py::TestSearchAndVerifyFilter::test_search_flights_stop_1___New_Delhi____BOM____29_05_2022____1_Stop__</td>
+          <td class="col-duration">65.23</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_searchflights.TestSearchAndVerifyFilter testMethod=test_search_flights_stop_1___New_Delhi____BOM____29_05_2022____1_Stop__&gt;<br/>goingfrom = &#x27;New Delhi&#x27;, goingto = &#x27;BOM&#x27;, date = &#x27;29/05/2022&#x27;, stops = &#x27;1 Stop&#x27;<br/><br/>    @data(*Utils.read_dat_from_csv(&quot;testdata\\tdatacsv.csv&quot;))<br/>    @unpack<br/>    def test_search_flights_stop(self,goingfrom,goingto,date,stops):<br/>        #note four arguments and four per test case in the data tag<br/>        search_flight_result = self.lp.searchFlights(goingfrom,goingto,date)<br/>        self.lp.page_scroll()<br/>        self.lp.go_to_top_of_page()<br/>        search_flight_result.filter_flights_by_stop(stops)<br/>        allstops = search_flight_result.get_search_flight_results()<br/>        self.log.info(len(allstops))<br/>&gt;       self.ut.assertListItemText(allstops,stops)<br/><br/>testcases\test_searchflights.py:47: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>utilities\utils.py:20: in assertListItemText<br/>    self.assert_all()<br/>C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py:139: in assert_all<br/>    self.fail(&#x27;&#x27;.join(failure_output))<br/><span class="error">E   AssertionError: ++++ soft assert failure details follow below ++++</span><br/><span class="error">E   </span><br/><span class="error">E   ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><br/><span class="error">E   The following 49 failures were found in &quot;wrapper&quot; (utilities.utils.Utils):</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 1 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [1/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 2 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [2/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 3 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [3/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 4 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [4/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 5 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [5/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 6 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [6/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 7 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [7/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 8 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [8/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 9 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [9/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 10 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [10/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 11 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [11/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 12 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [12/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 13 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [13/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 14 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [14/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 15 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [15/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 16 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [16/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 17 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [17/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 18 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [18/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 19 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [19/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 20 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [20/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 21 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [21/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 22 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [22/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 23 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [23/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 24 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [24/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 25 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [25/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 26 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [26/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 27 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [27/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 28 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [28/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 29 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [29/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 30 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [30/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 31 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [31/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 32 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [32/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 33 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [33/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 34 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;2 Stop(s)&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - 2 Stop(s)</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [34/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 35 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;2 Stop(s)&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - 2 Stop(s)</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [35/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 36 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [36/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 37 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;2 Stop(s)&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - 2 Stop(s)</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [37/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 38 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [38/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 39 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [39/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 40 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [40/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 41 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [41/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 42 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [42/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 43 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [43/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 44 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [44/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 45 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [45/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 46 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [46/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 47 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [47/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 48 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [48/49] +-</span><br/><span class="error">E   </span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E    Failure 49 (&quot;wrapper&quot; method)</span><br/><span class="error">E   +----------------------+----------------------+----------------------+</span><br/><span class="error">E   Traceback (most recent call last):</span><br/><span class="error">E     File &quot;C:\TestFrameWorkDemo\utilities\utils.py&quot;, line 14, in assertListItemText</span><br/><span class="error">E       self.soft_assert(self.assertEqual, item.text,value)</span><br/><span class="error">E     File &quot;c:\TestFrameWorkDemo\testcases\test_searchflights.py&quot;, line 47, in test_search_flights_stop</span><br/><span class="error">E       self.ut.assertListItemText(allstops,stops)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\ddt.py&quot;, line 191, in wrapper</span><br/><span class="error">E       return func(self, *args, **kwargs)</span><br/><span class="error">E     File &quot;C:\Users\Payan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packages\Python39\site-packages\softest\case.py&quot;, line 62, in soft_assert</span><br/><span class="error">E       assert_method(*arguments, **keywords)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 837, in assertEqual</span><br/><span class="error">E       assertion_func(first, second, msg=msg)</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 1217, in assertMultiLineEqual</span><br/><span class="error">E       self.fail(self._formatMessage(msg, standardMsg))</span><br/><span class="error">E     File &quot;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.2800.0_x64__qbz5n2kfra8p0\lib\unittest\case.py&quot;, line 676, in fail</span><br/><span class="error">E       raise self.failureException(msg)</span><br/><span class="error">E   AssertionError: &#x27;Non Stop&#x27; != &#x27;1 Stop&#x27;</span><br/><span class="error">E   - Non Stop</span><br/><span class="error">E   ? ^^^</span><br/><span class="error">E   + 1 Stop</span><br/><span class="error">E   ? ^</span><br/><span class="error">E   </span><br/><span class="error">E   </span><br/><span class="error">E   -+ [49/49] +-</span><br/> -----------------------------Captured stderr setup------------------------------ <br/>
+
+====== WebDriver manager ======
+Current google-chrome version is 97.0.4692
+Get LATEST chromedriver version for 97.0.4692 google-chrome
+Driver [C:\Users\Payan\.wdm\drivers\chromedriver\win32\97.0.4692.71\chromedriver.exe] found in cache
+<br/> -------------------------------Captured log setup------------------------------- <br/>INFO     WDM:logger.py:26 
+
+INFO     WDM:logger.py:26 ====== WebDriver manager ======
+INFO     WDM:logger.py:26 Current google-chrome version is 97.0.4692
+INFO     WDM:logger.py:26 Get LATEST chromedriver version for 97.0.4692 google-chrome
+INFO     WDM:logger.py:26 Driver [C:\Users\Payan\.wdm\drivers\chromedriver\win32\97.0.4692.71\chromedriver.exe] found in cache<br/> ------------------------------Captured stdout call------------------------------ <br/>the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: Non Stop
+test failed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: Non Stop
+test failed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 2 Stop(s)
+test failed
+the text is: 2 Stop(s)
+test failed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: Non Stop
+test failed
+the text is: 2 Stop(s)
+test failed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: Non Stop
+test failed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: Non Stop
+test failed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+the text is: 1 Stop
+test passed
+<br/> -------------------------------Captured log call-------------------------------- <br/>INFO     LaunchPage:yatra_launch_page.py:52 Clicked on depart from
+INFO     LaunchPage:yatra_launch_page.py:55 Typed New Delhi into departing from field successfully
+INFO     LaunchPage:yatra_launch_page.py:59 New Delhi (DEL)
+Indira Gandhi International
+India
+INFO     LaunchPage:yatra_launch_page.py:68 Clicked on going to
+INFO     LaunchPage:yatra_launch_page.py:71 Typed BOM into departing from field successfully
+INFO     LaunchPage:yatra_launch_page.py:75 Mumbai (BOM)
+Chhatrapati Shivaji International
+India
+INFO     LaunchPage:yatra_launch_page.py:83 Clicked on select date field(departure)
+INFO     LaunchPage:yatra_launch_page.py:84 searching for 29/05/2022 date
+INFO     LaunchPage:yatra_launch_page.py:89 clicked on a departure date now waiting(for a firefox sync issue)
+INFO     LaunchPage:yatra_launch_page.py:96 Clicked on search button
+INFO     SearchFlightResults:search_flights_results_page.py:47 Please provide valid filter option
+INFO     TestSearchAndVerifyFilter:test_searchflights.py:46 152<br/></div></td></tr></tbody></table></body></html>

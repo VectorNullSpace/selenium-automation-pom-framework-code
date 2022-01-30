@@ -1,0 +1,15 @@
+{
+    "test1": {
+        "goingfrom": "New Delhi",
+        "goingto": "JFK",
+        "date": "14/03/2022",
+        "stops": "1 Stop"
+    },
+    "test2": {
+        "goingfrom": "BOM",
+        "goingto": "MEL",
+        "date": "14/10/2022",
+        "stops": "2 Stops"
+    }
+
+}

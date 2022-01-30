@@ -1,0 +1,3 @@
+.pytest_cashe/
+*.log
+*__pycache__
