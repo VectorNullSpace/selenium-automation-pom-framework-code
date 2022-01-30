@@ -39,8 +39,7 @@ class TestSearchAndVerifyFilter(softest.TestCase):
     def test_search_flights_stop(self,goingfrom,goingto,date,stops):
         #note four arguments and four per test case in the data tag
         search_flight_result = self.lp.searchFlights(goingfrom,goingto,date)
-        self.lp.page_scroll()
-        self.lp.go_to_top_of_page()
+        self.lp.page_scroll(go_to_top=True)
         search_flight_result.filter_flights_by_stop(stops)
         allstops = search_flight_result.get_search_flight_results()
         self.log.info(len(allstops))
