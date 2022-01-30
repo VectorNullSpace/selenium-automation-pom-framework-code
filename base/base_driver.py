@@ -9,7 +9,7 @@ class BaseDriver:
     def __init__(self, driver):
         self.driver = driver
 
-    def page_scroll(self):
+    def page_scroll(self, go_to_top = True):
         last_height = self.driver.execute_script("return document.body.scrollHeight")
         match = False
         while (match == False):
@@ -22,9 +22,13 @@ class BaseDriver:
                 match = True
             last_height = new_height
 
-    def go_to_top_of_page(self):
-        self.driver.execute_script("window.scrollTo(0, 0);")
-        time.sleep(2)
+        if go_to_top == True:
+            self.driver.execute_script("window.scrollTo(0, 0);")
+            time.sleep(2)
+        
+        time.sleep(4)
+
+        
 
     def wait_for_presence_of_all_elements(self, locator_type,locator):
         wait = WebDriverWait(self.driver,10)
