@@ -20,8 +20,11 @@ class LaunchPage(BaseDriver):
     ALL_DATES = "//td[@data-date]"
     SEARCH_BUTTON = "//input[@value='Search Flights']"
     ONE_WAY_BUTTON = "//a[@title='One Way']"
+    POP_UP_DENY_BUTTON = '//*[@id="deny"]'
 
-        
+    def getPopUpButton(self):
+        return self.driver.find_element(By.XPATH, self.POP_UP_BUTTON)    
+
     def getDepartFromField(self):
         return self.driver.find_element(By.XPATH, self.DEPART_FROM_FIELD) 
     
@@ -42,6 +45,12 @@ class LaunchPage(BaseDriver):
 
     def getOneWayButton(self):
         return self.driver.find_element(By.XPATH, self.ONE_WAY_BUTTON)
+
+    def removePopUp(self):
+        #check if pop up exists
+        self.log.warning("feature does not exist yet")
+        #if pop up exists remove it
+        #else do nothing
 
     def selectOneWayButton(self):
         self.getOneWayButton().click()
@@ -82,6 +91,7 @@ class LaunchPage(BaseDriver):
         self.log.info("Clicked on select date field(departure)")
         self.log.info("searching for {} date".format(departuredate))
         flight_dates = self.getAllDates()
+        time.sleep(500)
         for date in flight_dates:
             if date.get_attribute("id") == departuredate:
                 date.click()
@@ -96,6 +106,7 @@ class LaunchPage(BaseDriver):
         time.sleep(8) 
 
     def searchFlights(self, departlocation, goingtolocation, departuredate):
+        self.removePopUp()
         self.selectOneWayButton()
         self.enterDepartFromLocation(departlocation)
         self.enterGoingToLocation(goingtolocation)
