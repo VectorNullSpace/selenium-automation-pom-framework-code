@@ -48,7 +48,7 @@ class LaunchPage(BaseDriver):
 
     def removePopUp(self):
         #check if pop up exists
-        self.log.info("feature does not exist yet")
+        self.log.warning("feature does not exist yet")
         #if pop up exists remove it
         #else do nothing
 
@@ -91,7 +91,6 @@ class LaunchPage(BaseDriver):
         self.log.info("Clicked on select date field(departure)")
         self.log.info("searching for {} date".format(departuredate))
         flight_dates = self.getAllDates()
-        time.sleep(500)
         for date in flight_dates:
             if date.get_attribute("id") == departuredate:
                 date.click()
