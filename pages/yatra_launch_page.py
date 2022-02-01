@@ -48,7 +48,7 @@ class LaunchPage(BaseDriver):
 
     def removePopUp(self):
         #check if pop up exists
-        self.log.warning("feature does not exist yet")
+        self.log.info("feature does not exist yet")
         #if pop up exists remove it
         #else do nothing
 
